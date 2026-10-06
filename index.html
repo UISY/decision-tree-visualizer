@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Decision Tree Visualizer</title>
+<meta name="description" content="Interaktive Lern-App für Entscheidungsbäume und Klassifikation.">
+<style>
+:root{
+  --bg:#f6f8ff;--card:#ffffff;--soft:#f8faff;--text:#172033;--muted:#6c778a;--line:#dce4f2;
+  --accent:#6d5dfc;--accent2:#00b9c9;--accent3:#ff9a4d;--good:#15865a;--bad:#c63e45;
+  --shadow:0 16px 42px rgba(38,55,105,.11);--grid:#e8edf7;--axis:#8c98aa;
+}
+[data-theme="dark"]{
+  --bg:#0c1118;--card:#151b24;--soft:#101720;--text:#edf2ff;--muted:#9ba8ba;--line:#2a3544;
+  --accent:#9a8cff;--accent2:#44d6df;--accent3:#ffb177;--good:#79e2ad;--bad:#ff9ca3;
+  --shadow:0 18px 48px rgba(0,0,0,.34);--grid:#26313e;--axis:#7b8798;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(circle at 10% 0%,rgba(109,93,252,.11),transparent 27%),
+    radial-gradient(circle at 92% 8%,rgba(0,185,201,.10),transparent 24%),
+    var(--bg);
+  transition:.25s
+}
+.topbar{
+  display:flex;justify-content:space-between;gap:24px;align-items:flex-start;
+  padding:34px clamp(20px,5vw,64px) 22px;
+  background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 12%,var(--card)),color-mix(in srgb,var(--accent2) 10%,var(--card)) 55%,color-mix(in srgb,var(--accent3) 12%,var(--card)));
+  border-bottom:1px solid var(--line)
+}
+.eyebrow{font-size:.8rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(2.2rem,4vw,3.4rem);margin:.25rem 0 .4rem;line-height:1.04}
+.topbar p{margin:0;color:var(--muted);font-size:1.04rem}
+.header-actions{display:flex;gap:10px;flex-wrap:wrap}
+button{
+  border:0;border-radius:13px;padding:11px 15px;font-weight:900;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;
+  transition:.15s
+}
+button:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 8px 20px rgba(109,93,252,.18)}
+.theme-toggle{background:var(--card);color:var(--text);border:1px solid var(--line);box-shadow:var(--shadow)}
+.layout{max-width:1500px;margin:auto;padding:26px clamp(20px,5vw,64px) 42px;display:grid;grid-template-columns:300px 1fr;gap:24px}
+.panel,.content{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
+.controls{padding:22px;position:sticky;top:16px;height:max-content}
+.controls h2{margin:0 0 8px}
+.helper{font-size:.9rem;color:var(--muted);line-height:1.45;margin:0 0 6px}
+.controls label,.predict-card label{display:flex;justify-content:space-between;gap:12px;margin-top:18px;font-weight:800}
+.controls input,.predict-card input{width:100%;accent-color:var(--accent)}
+.content{padding:20px;min-width:0}
+.tabs{display:flex;gap:9px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:14px}
+.tab{background:var(--soft);color:var(--text);border:1px solid var(--line)}
+.tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border-color:transparent}
+.tab-panel{display:none;padding:24px 2px 4px;animation:fade .2s ease}
+.tab-panel.active{display:block}
+@keyframes fade{from{opacity:.45;transform:translateY(3px)}to{opacity:1;transform:none}}
+.hero-card{
+  border:1px solid var(--line);border-radius:20px;padding:24px;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 10%,var(--card)),var(--card) 60%,color-mix(in srgb,var(--accent2) 8%,var(--card)))
+}
+.badge{display:inline-block;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;padding:7px 10px;border-radius:999px;font-size:.76rem;font-weight:900;letter-spacing:.08em}
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.info-card,.chart-card,.metric,.predict-card,.tree-card{border:1px solid var(--line);border-radius:18px;background:var(--card)}
+.info-card{padding:18px}
+.info-card:nth-child(1){box-shadow:inset 0 4px 0 var(--accent)}
+.info-card:nth-child(2){box-shadow:inset 0 4px 0 var(--accent2)}
+.info-card:nth-child(3){box-shadow:inset 0 4px 0 var(--accent3)}
+.callout{display:inline-flex;gap:8px;align-items:center;padding:8px 11px;border:1px solid var(--line);border-radius:999px;background:var(--soft);color:var(--muted);font-size:.9rem;font-weight:800}
+.chart-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(250px,1fr);gap:18px}
+.chart-card{padding:12px;overflow:hidden;background:linear-gradient(180deg,var(--card),var(--soft))}
+.chart-card svg,.tree-card svg{width:100%;height:auto;display:block}
+.metrics{display:grid;gap:10px}
+.metric{padding:14px;position:relative;overflow:hidden}
+.metric::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(var(--accent),var(--accent2))}
+.metric span{display:block;color:var(--muted);font-size:.85rem}
+.metric strong{font-size:1.5rem}
+.tree-card{padding:14px;margin-top:18px;background:linear-gradient(180deg,var(--card),var(--soft))}
+.predict-card{padding:20px;background:linear-gradient(135deg,var(--card),color-mix(in srgb,var(--accent2) 7%,var(--card)))}
+.result{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--soft)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;color:var(--muted);font-weight:800;font-size:.9rem}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px}
+.dot.a{background:#ff9a4d}.dot.b{background:#00b9c9}
+details{margin-top:18px;border:1px solid var(--line);border-radius:14px;background:var(--soft);padding:14px}
+summary{cursor:pointer;font-weight:900}
+.axis{stroke:var(--axis);stroke-width:1.2}.grid{stroke:var(--grid);stroke-width:1}
+.pointA{fill:#ff9a4d;stroke:var(--card);stroke-width:2}.pointB{fill:#00b9c9;stroke:var(--card);stroke-width:2}
+.boundaryA{fill:color-mix(in srgb,#ff9a4d 16%,transparent)}.boundaryB{fill:color-mix(in srgb,#00b9c9 16%,transparent)}
+.split{stroke:var(--accent);stroke-width:3;stroke-dasharray:8 6}
+.tick,.axis-label{fill:var(--muted);font-size:13px}.axis-label{font-weight:800}
+.tree-node{fill:var(--card);stroke:var(--line);stroke-width:2}.tree-text{fill:var(--text);font-size:14px;font-weight:800}
+.tree-edge{stroke:var(--axis);stroke-width:2}
+footer{text-align:center;color:var(--muted);padding:0 20px 32px}
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr}.controls{position:static}.three-col{grid-template-columns:1fr}.chart-grid{grid-template-columns:1fr}.topbar{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <div class="eyebrow">ML Learning Lab · Projekt 3</div>
+    <h1>🌳 Decision Tree Visualizer</h1>
+    <p>Verstehen → Daten teilen → Baumtiefe verändern → Vorhersage nachvollziehen</p>
+  </div>
+  <div class="header-actions">
+    <button id="themeToggle" class="theme-toggle" type="button">🌙 Dunkelmodus</button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="panel controls">
+    <h2>🎛️ Baum-Labor</h2>
+    <p class="helper">Verändere Daten, Rauschen und Baumtiefe. Beobachte, wie der Entscheidungsbaum die Fläche in Bereiche aufteilt.</p>
+
+    <label>Datenpunkte <span id="nVal">36</span></label>
+    <input id="n" type="range" min="16" max="80" value="36" step="2">
+
+    <label>Rauschen <span id="noiseVal">0.8</span></label>
+    <input id="noise" type="range" min="0" max="2.0" value="0.8" step="0.1">
+
+    <label>Max. Baumtiefe <span id="depthVal">2</span></label>
+    <input id="depth" type="range" min="1" max="4" value="2" step="1">
+
+    <label>Zufalls-Seed <span id="seedVal">42</span></label>
+    <input id="seed" type="range" min="0" max="100" value="42" step="1">
+  </aside>
+
+  <section class="content">
+    <nav class="tabs">
+      <button class="tab active" data-tab="understand">1️⃣ Verstehen</button>
+      <button class="tab" data-tab="explore">2️⃣ Ausprobieren</button>
+      <button class="tab" data-tab="predict">3️⃣ Vorhersagen</button>
+    </nav>
+
+    <section id="understand" class="tab-panel active">
+      <div class="hero-card">
+        <span class="badge">SCHRITT 1</span>
+        <h2>Was macht ein Entscheidungsbaum?</h2>
+        <p>Ein Entscheidungsbaum stellt nacheinander einfache Fragen wie <strong>„Ist x₁ kleiner als 0,7?“</strong>. Dadurch werden die Daten Schritt für Schritt in immer kleinere Bereiche aufgeteilt, bis eine Klasse vorhergesagt wird.</p>
+      </div>
+
+      <div class="three-col">
+        <article class="info-card"><h3>Split</h3><p>Eine Frage teilt die Daten in zwei Gruppen.</p></article>
+        <article class="info-card"><h3>Knoten</h3><p>Jeder Knoten enthält eine Regel oder Entscheidung.</p></article>
+        <article class="info-card"><h3>Blatt</h3><p>Am Ende steht die vorhergesagte Klasse.</p></article>
+      </div>
+
+      <p><strong>Baumtiefe</strong> ist wichtig: Ein sehr flacher Baum kann zu einfach sein. Ein sehr tiefer Baum kann Trainingsdaten zu stark auswendig lernen und dadurch overfitten.</p>
+    </section>
+
+    <section id="explore" class="tab-panel">
+      <h2>📊 So teilt der Baum den Raum</h2>
+      <p>Die farbigen Hintergründe sind die Entscheidungsbereiche. Die gestrichelten Linien zeigen die Splits.</p>
+      <span class="callout">💡 Tipp: Erhöhe die Baumtiefe und danach das Rauschen.</span>
+
+      <div class="chart-grid" style="margin-top:16px">
+        <div class="chart-card">
+          <svg id="chart" viewBox="0 0 820 520" aria-label="Entscheidungsgrenzen"></svg>
+          <div class="legend"><span><i class="dot a"></i>Klasse 0</span><span><i class="dot b"></i>Klasse 1</span></div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><span>Trainings-Accuracy</span><strong id="accuracy">–</strong></div>
+          <div class="metric"><span>Anzahl Blätter</span><strong id="leaves">–</strong></div>
+          <div class="metric"><span>Gelernte Tiefe</span><strong id="actualDepth">–</strong></div>
+          <div class="metric"><span>Erster Split</span><strong id="firstSplit">–</strong></div>
+        </div>
+      </div>
+
+      <div class="tree-card">
+        <h3>🌿 Vereinfachter Baum</h3>
+        <svg id="treeSvg" viewBox="0 0 900 360" aria-label="Vereinfachte Baumdarstellung"></svg>
+      </div>
+
+      <details>
+        <summary>Warum kann ein tiefer Baum problematisch sein?</summary>
+        <p>Mit mehr Tiefe kann der Baum sehr spezielle Regeln lernen. Das erhöht oft die Trainingsgenauigkeit, kann aber dazu führen, dass neue Daten schlechter vorhergesagt werden. Das nennt man Overfitting.</p>
+      </details>
+    </section>
+
+    <section id="predict" class="tab-panel">
+      <h2>🎯 Neue Punkte klassifizieren</h2>
+      <div class="predict-card">
+        <label>x₁ <span id="pxVal">0.0</span></label>
+        <input id="px" type="range" min="-4" max="4" value="0" step="0.1">
+
+        <label>x₂ <span id="pyVal">0.0</span></label>
+        <input id="py" type="range" min="-4" max="4" value="0" step="0.1">
+
+        <div class="result">
+          Vorhergesagte Klasse: <strong id="predClass">–</strong><br>
+          <span id="pathText" style="color:var(--muted)">–</span>
+        </div>
+      </div>
+
+      <div class="chart-card" style="margin-top:16px">
+        <svg id="predChart" viewBox="0 0 820 500" aria-label="Vorhersagepunkt im Entscheidungsraum"></svg>
+      </div>
+    </section>
+  </section>
+</main>
+
+<footer>ML Learning Lab · Projekt 3 · Decision Tree · Läuft komplett im Browser</footer>
+
+<script>
+const $=id=>document.getElementById(id);
+const state={data:[],tree:null};
+
+function applyTheme(theme){
+  document.documentElement.setAttribute("data-theme",theme);
+  $("themeToggle").textContent=theme==="dark"?"☀️ Hellmodus":"🌙 Dunkelmodus";
+}
+const saved=localStorage.getItem("ml-theme");
+applyTheme(saved||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+$("themeToggle").addEventListener("click",()=>{
+  const next=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";
+  localStorage.setItem("ml-theme",next);applyTheme(next);drawAll();drawTree();
+});
+
+function mulberry32(seed){return function(){let t=seed+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+function gaussian(r){let u=0,v=0;while(!u)u=r();while(!v)v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+
+function generate(){
+  const n=+$("n").value,noise=+$("noise").value,seed=+$("seed").value,r=mulberry32(seed+1);
+  state.data=[];
+  for(let i=0;i<n;i++){
+    const cls=i<n/2?0:1;
+    const base=cls?1.3:-1.3;
+    const x=base+gaussian(r)*(0.75+noise*.45);
+    const y=(cls?1:-1)*0.8+gaussian(r)*(0.95+noise*.35);
+    state.data.push({x,y,c:cls});
+  }
+  train();
+  update();
+}
+
+function gini(items){
+  if(!items.length)return 0;
+  const ones=items.filter(d=>d.c===1).length,p=ones/items.length;
+  return 1-(p*p+(1-p)*(1-p))
+}
+function majority(items){
+  const ones=items.filter(d=>d.c===1).length;
+  return ones>=items.length/2?1:0
+}
+function bestSplit(items){
+  let best=null;
+  for(const feature of ["x","y"]){
+    const vals=[...items].map(d=>d[feature]).sort((a,b)=>a-b);
+    for(let i=1;i<vals.length;i++){
+      const t=(vals[i-1]+vals[i])/2;
+      const left=items.filter(d=>d[feature]<t),right=items.filter(d=>d[feature]>=t);
+      if(!left.length||!right.length)continue;
+      const score=(left.length*gini(left)+right.length*gini(right))/items.length;
+      if(!best||score<best.score)best={feature,t,left,right,score}
+    }
+  }
+  return best
+}
+function build(items,depth,maxDepth){
+  const pred=majority(items);
+  if(depth>=maxDepth||gini(items)<.0001||items.length<4)return{leaf:true,pred,items,depth};
+  const s=bestSplit(items);
+  if(!s)return{leaf:true,pred,items,depth};
+  return{
+    leaf:false,pred,items,depth,feature:s.feature,t:s.t,
+    left:build(s.left,depth+1,maxDepth),right:build(s.right,depth+1,maxDepth)
+  }
+}
+function train(){
+  state.tree=build(state.data,0,+$("depth").value)
+}
+function predictPoint(x,y,node=state.tree,path=[]){
+  if(node.leaf)return{pred:node.pred,path};
+  const v=node.feature==="x"?x:y;
+  const goLeft=v<node.t;
+  const label=(node.feature==="x"?"x₁":"x₂")+" "+(goLeft?"<":"≥")+" "+node.t.toFixed(2);
+  return predictPoint(x,y,goLeft?node.left:node.right,[...path,label])
+}
+function getLeaves(node){
+  if(node.leaf)return[node];
+  return[...getLeaves(node.left),...getLeaves(node.right)]
+}
+function getDepth(node){
+  if(node.leaf)return node.depth;
+  return Math.max(getDepth(node.left),getDepth(node.right))
+}
+
+function update(){
+  $("nVal").textContent=$("n").value;
+  $("noiseVal").textContent=(+$("noise").value).toFixed(1);
+  $("depthVal").textContent=$("depth").value;
+  $("seedVal").textContent=$("seed").value;
+
+  let ok=0;
+  for(const d of state.data) if(predictPoint(d.x,d.y).pred===d.c)ok++;
+  $("accuracy").textContent=(ok/state.data.length*100).toFixed(1)+"%";
+  $("leaves").textContent=getLeaves(state.tree).length;
+  $("actualDepth").textContent=getDepth(state.tree);
+  $("firstSplit").textContent=state.tree.leaf?"Kein Split":(state.tree.feature==="x"?"x₁":"x₂")+" < "+state.tree.t.toFixed(2);
+
+  updatePrediction();
+  drawAll();
+  drawTree();
+}
+
+function svgEl(name,attrs={}){const e=document.createElementNS("http://www.w3.org/2000/svg",name);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);return e}
+
+function drawDecision(svg,withPrediction=false){
+  svg.innerHTML="";
+  const W=820,H=withPrediction?500:520,M={l:64,r:24,t:24,b:54};
+  const xmin=-4,xmax=4,ymin=-4,ymax=4;
+  const sx=x=>M.l+(x-xmin)/(xmax-xmin)*(W-M.l-M.r);
+  const sy=y=>H-M.b-(y-ymin)/(ymax-ymin)*(H-M.t-M.b);
+
+  const cols=48,rows=48;
+  for(let i=0;i<cols;i++){
+    for(let j=0;j<rows;j++){
+      const xa=xmin+(xmax-xmin)*i/cols,xb=xmin+(xmax-xmin)*(i+1)/cols;
+      const ya=ymin+(ymax-ymin)*j/rows,yb=ymin+(ymax-ymin)*(j+1)/rows;
+      const p=predictPoint((xa+xb)/2,(ya+yb)/2).pred;
+      svg.appendChild(svgEl("rect",{x:sx(xa),y:sy(yb),width:sx(xb)-sx(xa)+1,height:sy(ya)-sy(yb)+1,class:p?"boundaryB":"boundaryA"}))
+    }
+  }
+
+  for(let i=-4;i<=4;i++){
+    const xx=sx(i),yy=sy(i);
+    svg.appendChild(svgEl("line",{x1:xx,x2:xx,y1:M.t,y2:H-M.b,class:"grid"}));
+    svg.appendChild(svgEl("line",{x1:M.l,x2:W-M.r,y1:yy,y2:yy,class:"grid"}));
+    const tx=svgEl("text",{x:xx,y:H-M.b+24,"text-anchor":"middle",class:"tick"});tx.textContent=i;svg.appendChild(tx);
+    const ty=svgEl("text",{x:M.l-10,y:yy+4,"text-anchor":"end",class:"tick"});ty.textContent=i;svg.appendChild(ty)
+  }
+  svg.appendChild(svgEl("line",{x1:M.l,x2:W-M.r,y1:H-M.b,y2:H-M.b,class:"axis"}));
+  svg.appendChild(svgEl("line",{x1:M.l,x2:M.l,y1:M.t,y2:H-M.b,class:"axis"}));
+
+  drawSplits(svg,state.tree,{xmin,xmax,ymin,ymax},sx,sy);
+
+  for(const d of state.data){
+    svg.appendChild(svgEl("circle",{cx:sx(d.x),cy:sy(d.y),r:7,class:d.c?"pointB":"pointA"}))
+  }
+
+  if(withPrediction){
+    const x=+$("px").value,y=+$("py").value,p=predictPoint(x,y).pred;
+    svg.appendChild(svgEl("circle",{cx:sx(x),cy:sy(y),r:12,fill:"white",stroke:p?"#00b9c9":"#ff9a4d","stroke-width":"5"}))
+  }
+
+  const tx=svgEl("text",{x:(M.l+W-M.r)/2,y:H-10,"text-anchor":"middle",class:"axis-label"});tx.textContent="x₁";svg.appendChild(tx);
+  const ty=svgEl("text",{x:18,y:(M.t+H-M.b)/2,transform:"rotate(-90 18 "+((M.t+H-M.b)/2)+")","text-anchor":"middle",class:"axis-label"});ty.textContent="x₂";svg.appendChild(ty)
+}
+function drawSplits(svg,node,bounds,sx,sy){
+  if(node.leaf)return;
+  if(node.feature==="x"){
+    svg.appendChild(svgEl("line",{x1:sx(node.t),x2:sx(node.t),y1:sy(bounds.ymax),y2:sy(bounds.ymin),class:"split"}));
+    drawSplits(svg,node.left,{...bounds,xmax:node.t},sx,sy);
+    drawSplits(svg,node.right,{...bounds,xmin:node.t},sx,sy)
+  }else{
+    svg.appendChild(svgEl("line",{x1:sx(bounds.xmin),x2:sx(bounds.xmax),y1:sy(node.t),y2:sy(node.t),class:"split"}));
+    drawSplits(svg,node.left,{...bounds,ymax:node.t},sx,sy);
+    drawSplits(svg,node.right,{...bounds,ymin:node.t},sx,sy)
+  }
+}
+function drawAll(){drawDecision($("chart"));drawDecision($("predChart"),true)}
+
+function updatePrediction(){
+  const x=+$("px").value,y=+$("py").value,r=predictPoint(x,y);
+  $("pxVal").textContent=x.toFixed(1);$("pyVal").textContent=y.toFixed(1);
+  $("predClass").textContent="Klasse "+r.pred;
+  $("pathText").textContent=r.path.length?"Pfad: "+r.path.join(" → "):"Der Baum besteht nur aus einem Blatt."
+}
+
+function drawTree(){
+  const svg=$("treeSvg");svg.innerHTML="";
+  const levels={};
+  (function collect(node){
+    (levels[node.depth]??=[]).push(node);
+    if(!node.leaf){collect(node.left);collect(node.right)}
+  })(state.tree);
+
+  const positions=new Map();
+  Object.entries(levels).forEach(([depth,nodes])=>{
+    const d=+depth;
+    nodes.forEach((node,i)=>{
+      const x=(i+1)*900/(nodes.length+1),y=55+d*92;
+      positions.set(node,{x,y})
+    })
+  });
+
+  (function edges(node){
+    if(node.leaf)return;
+    const a=positions.get(node),l=positions.get(node.left),r=positions.get(node.right);
+    svg.appendChild(svgEl("line",{x1:a.x,y1:a.y+24,x2:l.x,y2:l.y-24,class:"tree-edge"}));
+    svg.appendChild(svgEl("line",{x1:a.x,y1:a.y+24,x2:r.x,y2:r.y-24,class:"tree-edge"}));
+    edges(node.left);edges(node.right)
+  })(state.tree);
+
+  positions.forEach((p,node)=>{
+    svg.appendChild(svgEl("rect",{x:p.x-72,y:p.y-24,width:144,height:48,rx:12,class:"tree-node"}));
+    const t=svgEl("text",{x:p.x,y:p.y+5,"text-anchor":"middle",class:"tree-text"});
+    t.textContent=node.leaf?"Klasse "+node.pred:(node.feature==="x"?"x₁":"x₂")+" < "+node.t.toFixed(2);
+    svg.appendChild(t)
+  })
+}
+
+["n","noise","depth","seed"].forEach(id=>$(id).addEventListener("input",generate));
+["px","py"].forEach(id=>$(id).addEventListener("input",()=>{updatePrediction();drawAll()}));
+document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
+  btn.classList.add("active");$(btn.dataset.tab).classList.add("active")
+}));
+
+generate();
+</script>
+</body>
+</html>
